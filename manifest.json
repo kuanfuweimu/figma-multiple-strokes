@@ -1,0 +1,18 @@
+{
+  "api": "1.0.0",
+  "documentAccess": "dynamic-page",
+  "editorType": [
+    "figma"
+  ],
+  "id": "0c754988-b770-4362-a647-fb6200b9b94d",
+  "isTool": true,
+  "main": "code.js",
+  "name": "Multiple strokes",
+  "relaunchButtons": [
+    {
+      "command": "0c754988-b770-4362-a647-fb6200b9b94d",
+      "name": "Multiple strokes"
+    }
+  ],
+  "ui": "ui.html"
+}

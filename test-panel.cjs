@@ -1,0 +1,67 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const {stripTypeScriptTypes}=require('node:module');
+const html=fs.readFileSync(__dirname+'/ui.html','utf8');
+const code=stripTypeScriptTypes(fs.readFileSync(__dirname+'/code.ts','utf8'));
+const elements={};
+for(const [id,value]of Object.entries({count:'4',weight:'4',gap:'4',offset:'4',join:'Round',mode:'Alternating',color1:'000000',color2:'#F8CF00',run:'',read:'',status:'',selection:''})){
+ elements[id]={value,textContent:'',listeners:{},attrs:new Set(id==='run'?['disabled']:[]),addEventListener(k,fn){this.listeners[k]=fn},setAttribute(k){this.attrs.add(k)},removeAttribute(k){this.attrs.delete(k)},hasAttribute(k){return this.attrs.has(k)}};
+}
+let listener,tick,backend,selection=[],events=[];
+for(const id of ['add-color','remove-color',...Array.from({length:10},(_,i)=>'color'+(i+3)),...Array.from({length:10},(_,i)=>'color-row-'+(i+3))])elements[id]={...elements.read,value:'#FFFFFF',listeners:{},attrs:new Set()};
+const figma={currentPage:{get selection(){return selection}},root:{setRelaunchData(){}},showUI(){},on(k,f){events[k]=f},ui:{postMessage(m){if(listener)listener({data:{pluginMessage:m}})}},commitUndo(){}};
+backend=vm.createContext({figma,__html__:html,console,setTimeout,clearTimeout});
+vm.runInContext(code,backend); // initial message can arrive before the iframe listener
+const sent=[];
+let domReady;
+const ui=vm.createContext({document:{readyState:'loading',addEventListener(k,f){if(k==='DOMContentLoaded')domReady=f},getElementById:id=>elements[id]},window:{addEventListener(k,f){if(k==='message')listener=f}},parent:{postMessage({pluginMessage:m}){sent.push(m);figma.ui.onmessage(m)}},setInterval:f=>(tick=f,1),clearInterval(){},console});
+vm.runInContext('const $ = "host"; const post = "host"; let busy = "host"; let valid = "host";',ui);
+vm.runInContext([...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1],ui);
+assert.equal(sent.length,0,'Must wait for DOM readiness');
+domReady();
+assert.equal(sent[0].type,'ready');
+assert.match(elements.selection.textContent,/Select one text/);
+assert.equal(elements.run.disabled,true);
+selection=[{type:'TEXT',visible:true,name:'Example',fills:[],getPluginData:()=>''}];
+events.selectionchange();
+assert.equal(elements.selection.textContent,'Source: Example');
+assert.equal(elements.run.disabled,false,'Unprefixed hex should work');
+elements['add-color'].listeners.click();
+assert.equal(elements['color-row-3'].hasAttribute('hidden'),false);
+elements.color3.value='00FF00';
+assert.equal(vm.runInContext("JSON.stringify(layerColor(settings({count:3,weight:4,gap:4,offset:4,colors:['#FF0000','#00FF00','#0000FF'],mode:'Gradient',join:'Round'}),1))",backend),JSON.stringify({r:0,g:1,b:0}));
+assert.equal(vm.runInContext("JSON.stringify(layerColor(settings({count:4,weight:4,gap:4,offset:4,colors:['#FF0000','#00FF00','#0000FF'],mode:'Alternating',join:'Round'}),3))",backend),JSON.stringify({r:1,g:0,b:0}));
+elements['remove-color'].listeners.click();assert.equal(elements['color-row-3'].hasAttribute('hidden'),true);
+elements.color1.value='invalid';elements.color1.listeners.input();
+assert.equal(elements.run.disabled,true);
+assert.match(elements.status.textContent,/hex color/);
+elements.color1.value='FF0000';elements.color1.listeners.change();
+assert.equal(elements.run.disabled,false);
+selection=[{type:'GROUP',getPluginData:()=>''}];elements.read.listeners.click();
+assert.equal(elements.run.disabled,true);
+assert.match(elements.selection.textContent,/not a group/);
+const source={type:'TEXT',visible:true,name:'Original',fills:[],getPluginData:k=>k==='multiple-strokes-v1'?'source':''};
+selection=[{type:'FRAME',children:[source],getPluginData:k=>k==='multiple-strokes-v1'?'result':JSON.stringify({count:3,weight:2,gap:5,offset:0,color1:'#123456',color2:'#FFFFFF',mode:'交替 / Alternating',join:'圆角 / Round'})}];
+events.selectionchange();
+assert.equal(elements.mode.value,'Alternating');assert.equal(elements.join.value,'Round');
+assert.equal(elements.run.textContent,'Apply changes');assert.equal(elements.run.disabled,false);
+let run;const realHandler=figma.ui.onmessage;
+figma.ui.onmessage=m=>{run=m};elements.run.listeners.click();
+assert.equal(run.type,'run');assert.equal(run.settings.color1,'#123456');assert.equal(run.settings.count,3);
+assert.equal(elements.run.disabled,true);
+listener({data:{pluginMessage:{type:'error',message:'Test failure'}}});
+assert.equal(elements.run.disabled,false);assert.equal(elements.status.textContent,'Test failure');
+assert(!/[\u3400-\u9fff]/.test(html));
+console.log('PASS: startup without customElements, selection, refresh, hex colors, validation, legacy settings, Apply message, error recovery, English UI.');
+console.log('PASS: host global-name collisions and delayed DOM initialization.');
+// Exercise the real asynchronous Apply handler, including its finally/report.
+(async()=>{
+ figma.ui.onmessage=realHandler;
+ selection=[{id:'test-text',type:'TEXT',visible:true,name:'Text',fills:[],getPluginData:()=>'',getStyledTextSegments:()=>[{fontName:{family:'UnavailableFont',style:'Regular'}}]}];
+ figma.loadFontAsync=async()=>{throw Error('Font unavailable')};
+ events.selectionchange();
+ await realHandler({type:'run',settings:{count:4,weight:4,gap:4,offset:4,color1:'#000000',color2:'#F8CF00',mode:'Alternating',join:'Round'}});
+ assert.match(elements.status.textContent,/Cannot load font UnavailableFont/,'Final selection refresh must not erase Apply failure');
+ assert.equal(elements.run.disabled,false,'Retry should be available after failure');
+ console.log('PASS: real Apply font rejection survives final selection refresh and re-enables retry.');
+})().catch(e=>{console.error(e);process.exitCode=1});
+
