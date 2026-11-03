@@ -7,6 +7,7 @@ for(const [id,value]of Object.entries({count:'4',weight:'4',gap:'4',offset:'4',j
  elements[id]={value,textContent:'',listeners:{},attrs:new Set(id==='run'?['disabled']:[]),addEventListener(k,fn){this.listeners[k]=fn},setAttribute(k){this.attrs.add(k)},removeAttribute(k){this.attrs.delete(k)},hasAttribute(k){return this.attrs.has(k)}};
 }
 let listener,tick,backend,selection=[],events=[];
+for(const id of ['ramp-controls','ramp-preview','reverse-ramp','space-ramp','interpolation',...Array.from({length:12},(_,i)=>'position'+(i+1)),...Array.from({length:12},(_,i)=>'position-row-'+(i+1))])elements[id]={...elements.read,value:id==='interpolation'?'Linear':id==='position2'?'100':'0',listeners:{},attrs:new Set(),style:{}};
 for(const id of ['add-color','remove-color',...Array.from({length:10},(_,i)=>'color'+(i+3)),...Array.from({length:10},(_,i)=>'color-row-'+(i+3))])elements[id]={...elements.read,value:'#FFFFFF',listeners:{},attrs:new Set()};
 const figma={currentPage:{get selection(){return selection}},root:{setRelaunchData(){}},showUI(){},on(k,f){events[k]=f},ui:{postMessage(m){if(listener)listener({data:{pluginMessage:m}})}},commitUndo(){}};
 backend=vm.createContext({figma,__html__:html,console,setTimeout,clearTimeout});
@@ -31,6 +32,15 @@ elements.color3.value='00FF00';
 assert.equal(vm.runInContext("JSON.stringify(layerColor(settings({count:3,weight:4,gap:4,offset:4,colors:['#FF0000','#00FF00','#0000FF'],mode:'Gradient',join:'Round'}),1))",backend),JSON.stringify({r:0,g:1,b:0}));
 assert.equal(vm.runInContext("JSON.stringify(layerColor(settings({count:4,weight:4,gap:4,offset:4,colors:['#FF0000','#00FF00','#0000FF'],mode:'Alternating',join:'Round'}),3))",backend),JSON.stringify({r:1,g:0,b:0}));
 elements['remove-color'].listeners.click();assert.equal(elements['color-row-3'].hasAttribute('hidden'),true);
+elements.mode.value='Ramp';elements.mode.listeners.change();
+assert.equal(elements['ramp-controls'].hasAttribute('hidden'),false);
+elements.position1.value='10';elements.position2.value='70';
+elements['reverse-ramp'].listeners.click();
+assert.equal(elements.position1.value,'30');assert.equal(elements.position2.value,'90');
+assert.match(elements['ramp-preview'].style.background,/linear-gradient/);
+elements['space-ramp'].listeners.click();assert.equal(elements.position1.value,'0');assert.equal(elements.position2.value,'100');
+elements.mode.value='Alternating';elements.mode.listeners.change();
+assert.equal(elements['ramp-controls'].hasAttribute('hidden'),true);
 elements.color1.value='invalid';elements.color1.listeners.input();
 assert.equal(elements.run.disabled,true);
 assert.match(elements.status.textContent,/hex color/);

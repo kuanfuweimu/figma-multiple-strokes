@@ -1,6 +1,6 @@
 const TOOL_ID = '0c754988-b770-4362-a647-fb6200b9b94d';
 const KEY = 'multiple-strokes-v1';
-type Settings = {count:number; weight:number; gap:number; offset:number; color1:string; color2:string; colors?:string[]; mode:string; join:string};
+type Settings = {count:number; weight:number; gap:number; offset:number; color1:string; color2:string; colors?:string[]; positions?:number[]; interpolation?:string; mode:string; join:string};
 let busy=false;
 let stage='Ready';
 function progress(message:string):void {stage=message;figma.ui.postMessage({type:'progress',message});}
@@ -10,17 +10,32 @@ function hex(v:string):string {const s=String(v).trim().replace(/^#/, '');return
 function settings(v:Settings):Settings {
  const colors=(Array.isArray(v.colors)?v.colors:[v.color1,v.color2]).map(hex);
  if(colors.length<2||colors.length>12)throw Error('Use 2 to 12 colors');
- const s={colors,count:Math.round(bounded(v.count,1,12)),weight:bounded(v.weight,0.5,80),gap:bounded(v.gap,0,80),offset:bounded(v.offset,0,80),color1:colors[0],color2:colors[1],mode:english(v.mode),join:english(v.join)};
+ const positions=Array.isArray(v.positions)?v.positions.map(p=>bounded(p,0,100)):colors.map((_,i)=>100*i/(colors.length-1));
+ if(positions.length!==colors.length)throw Error('Each color needs a ramp position');
+ const interpolation=v.interpolation||'Linear';
+ if(!['Linear','Smooth','Constant'].includes(interpolation))throw Error('Invalid ramp interpolation');
+ const s={colors,positions,interpolation,count:Math.round(bounded(v.count,1,12)),weight:bounded(v.weight,0.5,80),gap:bounded(v.gap,0,80),offset:bounded(v.offset,0,80),color1:colors[0],color2:colors[1],mode:english(v.mode),join:english(v.join)};
  for(const c of colors)if(!/^#[0-9a-f]{6}$/i.test(c))throw Error('Choose a valid hex color');
- if(!['Single','Alternating','Gradient'].includes(s.mode))throw Error('Invalid colour mode');
+ if(!['Single','Alternating','Gradient','Ramp'].includes(s.mode))throw Error('Invalid colour mode');
  if(!['Round','Miter','Bevel'].includes(s.join))throw Error('Invalid join');
  return s;
 }
 function rgb(hex:string):RGB {return {r:parseInt(hex.slice(1,3),16)/255,g:parseInt(hex.slice(3,5),16)/255,b:parseInt(hex.slice(5,7),16)/255};}
+function sampleRamp(colors:string[],positions:number[],position:number,interpolation:string):RGB {
+ const stops=colors.map((color,index)=>({color:rgb(color),position:positions[index],index})).sort((a,b)=>a.position-b.position||a.index-b.index);
+ if(position<stops[0].position)return stops[0].color;
+ let left=0;while(left+1<stops.length&&stops[left+1].position<=position)left++;
+ if(left===stops.length-1||interpolation==='Constant')return stops[left].color;
+ const a=stops[left],b=stops[left+1];
+ let t=(position-a.position)/(b.position-a.position);
+ if(interpolation==='Smooth')t=t*t*(3-2*t);
+ return {r:a.color.r+(b.color.r-a.color.r)*t,g:a.color.g+(b.color.g-a.color.g)*t,b:a.color.b+(b.color.b-a.color.b)*t};
+}
 function layerColor(s:Settings,i:number):RGB {
  const colors=s.colors||[s.color1,s.color2];
  if(s.mode==='Single')return rgb(colors[0]);
  if(s.mode==='Alternating')return rgb(colors[i%colors.length]);
+ if(s.mode==='Ramp')return sampleRamp(colors,s.positions||colors.map((_,j)=>100*j/(colors.length-1)),s.count===1?0:100*i/(s.count-1),s.interpolation||'Linear');
  const position=s.count===1?0:i/(s.count-1)*(colors.length-1);
  const left=Math.min(Math.floor(position),colors.length-2),t=position-left;
  const a=rgb(colors[left]),b=rgb(colors[left+1]);

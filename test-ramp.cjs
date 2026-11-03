@@ -1,0 +1,20 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const code=require('node:module').stripTypeScriptTypes(fs.readFileSync(__dirname+'/code.ts','utf8'));
+const ctx=vm.createContext({});vm.runInContext(code.slice(0,code.indexOf('function owned')),ctx);
+function sample(positions,p,mode='Linear',colors=['#FF0000','#00FF00','#0000FF']){return JSON.parse(vm.runInContext(`JSON.stringify(sampleRamp(${JSON.stringify(colors)},${JSON.stringify(positions)},${p},${JSON.stringify(mode)}))`,ctx))}
+assert.deepEqual(sample([0,25,100],25),{r:0,g:1,b:0});
+assert.deepEqual(sample([0,25,100],62.5),{r:0,g:.5,b:.5});
+assert.deepEqual(sample([20,50,80],0),{r:1,g:0,b:0});
+assert.deepEqual(sample([20,50,80],100),{r:0,g:0,b:1});
+assert.deepEqual(sample([0,50,50],50),{r:0,g:0,b:1});
+assert.deepEqual(sample([100,0,50],25),{r:0,g:.5,b:.5});
+assert.deepEqual(sample([0,25,100],20,'Constant'),{r:1,g:0,b:0});
+const smooth=sample([0,50,100],12.5,'Smooth');assert.equal(smooth.g,.15625);
+const base={count:5,weight:4,gap:4,offset:4,colors:['#FF0000','#00FF00','#0000FF'],mode:'Ramp',join:'Round',positions:[0,25,100]};
+const normalized=JSON.parse(vm.runInContext(`JSON.stringify(settings(${JSON.stringify(base)}))`,ctx));assert.equal(normalized.interpolation,'Linear');
+assert.equal(vm.runInContext(`layerColor(settings(${JSON.stringify(base)}),1).g`,ctx),1);
+assert.throws(()=>vm.runInContext(`settings(${JSON.stringify({...base,positions:[0,200,100]})})`,ctx));
+assert.throws(()=>vm.runInContext(`settings(${JSON.stringify({...base,positions:[0,100]})})`,ctx));
+assert.deepEqual(JSON.parse(vm.runInContext(`JSON.stringify(settings(${JSON.stringify({...base,positions:undefined,mode:'Gradient'})}).positions)`,ctx)),[0,50,100]);
+const roundTrip=JSON.parse(JSON.stringify(normalized));assert.deepEqual(roundTrip.positions,[0,25,100]);
+console.log('PASS: ramp stop positions, clamping, duplicate stops, sorting, linear/smooth/constant interpolation, layer sampling, validation and legacy migration.');

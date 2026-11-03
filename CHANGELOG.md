@@ -2,6 +2,8 @@
 
 ## 2026-11-03
 
+- Added Ramp mode with positioned stops, preview, interpolation, reverse and even spacing; regression tests pass. Actual host UI still needs user verification. / 增加 Ramp 色标位置、预览、插值、反转和均匀分布；回归测试通过，真实宿主界面仍待用户验证。
+
 - Implemented editable vector rings, original-source preservation and saved settings. / 实现矢量描边环、原始来源保留与参数保存。
 - Fixed panel initialization scope and timing. / 修正面板初始化作用域与加载时序。
 - Preserved Apply errors, added font-loading timeout and generation progress. / 保留 Apply 错误，增加字体超时及生成进度。
