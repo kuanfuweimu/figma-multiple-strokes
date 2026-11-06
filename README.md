@@ -56,3 +56,16 @@ Ramp 模式支持 2–12 个色标，各自设置 0–100% 位置，带色带预
 Overlapping glyph contours may reveal internal seams in some inputs. The reported overlap-normalization issue has not yet been fixed or validated.
 
 某些输入的字形重叠轮廓可能露出内部接缝；此问题尚未完成修复与验证。
+
+---
+
+## 源码字段中文补充 / Source-field Chinese equivalents
+
+- 插件 ID / Plugin ID：`0c754988-b770-4362-a647-fb6200b9b94d`。
+- Figma 源版本 / Figma source version：`54ef2f3817c2709f8845dcaf56696a447078f5dc`。
+- 快照日期 / Snapshot date：2026-11-03。
+- `code.ts`：Figma 沙箱几何与设置 / Figma sandbox geometry and settings。
+- `ui.html`：PropsKit 控件与 iframe 通信 / PropsKit controls and iframe communication。
+- `manifest.json`：Figma 托管的权威 manifest / Authoritative Figma-hosted manifest。
+- `test-panel.cjs`：本地模拟 UI/沙箱回归检查 / Local simulated UI/sandbox regression checks。
+- 上方验证命令使用 Node.js 24 / Run the validation commands above with Node.js 24。
